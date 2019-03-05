@@ -1,17 +1,9 @@
-module Engage.Http
-    exposing
-        ( Config
-        , configDecoder
-        , delete
-        , get
-        , getErrorMessage
-        , multipleServerErrorDecoder
-        , nullDecoder
-        , patch
-        , post
-        , put
-        , serverErrorDecoder
-        )
+module Engage.Http exposing
+    ( Config
+    , get, post, patch, put, delete
+    , getErrorMessage
+    , configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
+    )
 
 {-| Helpers for working with DNN Web API
 
@@ -43,22 +35,20 @@ import Json.Decode as Decode exposing (..)
 import Json.Decode.Pipeline exposing (..)
 import Json.Encode as Encode exposing (..)
 import RemoteData as RemoteData exposing (WebData)
-import RemoteData.Http as RemoteHttp
+import RemoteData.Http as RemoteHttp exposing (defaultTaskConfig)
 import String
 import Task as Task exposing (Task)
+import Url.Builder
 
 
 {-| Http GET
 -}
-get : Config -> Decode.Decoder success -> { methodName : String, queryStringParams : List ( String, String ) } -> Task Never (WebData success)
+get : Config -> Decode.Decoder success -> { methodName : String, queryStringParams : List ( String, String ) } -> Task () (WebData success)
 get { baseUrl, headers } decoder { methodName, queryStringParams } =
     let
-        config : RemoteHttp.Config
+        config : RemoteHttp.TaskConfig
         config =
-            { headers = headers
-            , withCredentials = False
-            , timeout = Nothing
-            }
+            { defaultTaskConfig | headers = headers }
 
         url : String
         url =
@@ -69,15 +59,12 @@ get { baseUrl, headers } decoder { methodName, queryStringParams } =
 
 {-| Http POST
 -}
-post : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task Never (WebData success)
+post : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task () (WebData success)
 post { baseUrl, headers } decoder { methodName, value } =
     let
-        config : RemoteHttp.Config
+        config : RemoteHttp.TaskConfig
         config =
-            { headers = headers
-            , withCredentials = False
-            , timeout = Nothing
-            }
+            { defaultTaskConfig | headers = headers }
 
         url : String
         url =
@@ -88,15 +75,12 @@ post { baseUrl, headers } decoder { methodName, value } =
 
 {-| Http PUT
 -}
-put : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task Never (WebData success)
+put : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task () (WebData success)
 put { baseUrl, headers } decoder { methodName, value } =
     let
-        config : RemoteHttp.Config
+        config : RemoteHttp.TaskConfig
         config =
-            { headers = headers
-            , withCredentials = False
-            , timeout = Nothing
-            }
+            { defaultTaskConfig | headers = headers }
 
         url : String
         url =
@@ -107,15 +91,12 @@ put { baseUrl, headers } decoder { methodName, value } =
 
 {-| Http PATCH
 -}
-patch : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task Never (WebData success)
+patch : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task () (WebData success)
 patch { baseUrl, headers } decoder { methodName, value } =
     let
-        config : RemoteHttp.Config
+        config : RemoteHttp.TaskConfig
         config =
-            { headers = headers
-            , withCredentials = False
-            , timeout = Nothing
-            }
+            { defaultTaskConfig | headers = headers }
 
         url : String
         url =
@@ -126,15 +107,12 @@ patch { baseUrl, headers } decoder { methodName, value } =
 
 {-| Http DELETE
 -}
-delete : Config -> { methodName : String, value : Encode.Value } -> Task Never (WebData String)
+delete : Config -> { methodName : String, value : Encode.Value } -> Task () (WebData String)
 delete { baseUrl, headers } { methodName, value } =
     let
-        config : RemoteHttp.Config
+        config : RemoteHttp.TaskConfig
         config =
-            { headers = headers
-            , withCredentials = False
-            , timeout = Nothing
-            }
+            { defaultTaskConfig | headers = headers }
 
         url : String
         url =
@@ -150,7 +128,7 @@ delete { baseUrl, headers } { methodName, value } =
 {-| Configuration type
 
   - `baseUrl` the base URL for Http request
-  - `headers`: `list of the header for Http request
+  - `headers`: list of the header for Http request
 
 -}
 type alias Config =
@@ -167,7 +145,7 @@ type alias Config =
 -}
 configDecoder : Decode.Decoder Config
 configDecoder =
-    decode Config
+    Decode.succeed Config
         |> required "baseUrl" Decode.string
         |> required "headers" httpHeaderDecoder
 
@@ -175,14 +153,13 @@ configDecoder =
 httpHeaderDecoder : Decode.Decoder (List Http.Header)
 httpHeaderDecoder =
     let
-        decoder : List ( String, String ) -> Decode.Decoder (List Http.Header)
+        decoder : List ( String, String ) -> List Http.Header
         decoder headers =
             headers
                 |> List.map (\( key, value ) -> Http.header key value)
-                |> decode
     in
     Decode.keyValuePairs Decode.string
-        |> Decode.andThen decoder
+        |> Decode.map decoder
 
 
 {-| Null decoder. Useful for when the server doesn't return any value.
@@ -200,13 +177,17 @@ ensureStringEndsWithSlash : String -> String
 ensureStringEndsWithSlash baseUrl =
     if String.endsWith "/" baseUrl then
         baseUrl
+
     else
         baseUrl ++ "/"
 
 
 urlwithQueryString : String -> String -> List ( String, String ) -> String
 urlwithQueryString baseUrl methodName queryStringParams =
-    RemoteHttp.url (ensureStringEndsWithSlash baseUrl ++ methodName) queryStringParams
+    queryStringParams
+        |> List.map (\( key, val ) -> Url.Builder.string key val)
+        |> Url.Builder.toQuery
+        |> (\query -> ensureStringEndsWithSlash baseUrl ++ methodName ++ query)
 
 
 {-| Get the localized error message from the `Http.Error`
@@ -214,8 +195,8 @@ urlwithQueryString baseUrl methodName queryStringParams =
 getErrorMessage : { a | localization : Localization } -> Http.Error -> String
 getErrorMessage args error =
     case error of
-        Http.BadUrl errorMessage ->
-            errorMessage
+        Http.BadUrl url ->
+            url
 
         Http.Timeout ->
             Localization.localizeString "NetworkTimeout" args
@@ -223,14 +204,15 @@ getErrorMessage args error =
         Http.NetworkError ->
             Localization.localizeString "NetworkError" args
 
-        Http.BadStatus response ->
-            response.body
-                |> Decode.decodeString (serverErrorDecoder args)
-                |> Result.toMaybe
-                |> Maybe.withDefault "Server.Error"
+        Http.BadStatus statusCode ->
+            let
+                defaultMessage =
+                    Localization.localizeStringWithDefault "Server.Error" "Server.Error" args
+            in
+            Localization.localizeStringWithDefault (String.fromInt statusCode) defaultMessage args
 
-        Http.BadPayload errorMessage { body } ->
-            errorMessage ++ " " ++ body
+        Http.BadBody errorMessage ->
+            errorMessage
 
 
 {-| Json decoder for server error, localized.
@@ -244,7 +226,6 @@ serverErrorDecoder args =
         , Decode.field "message" Decode.string
         , multipleServerErrorDecoder args
         ]
-        |> Decode.map (\message -> Localization.localizeStringWithDefault message message args)
 
 
 {-| Json decoder for multiple server error messages, localized.
