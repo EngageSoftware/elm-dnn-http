@@ -209,7 +209,7 @@ getErrorMessage args error =
                 defaultMessage =
                     Localization.localizeStringWithDefault "Server.Error" "Server.Error" args
             in
-            Localization.localizeStringWithDefault (String.fromInt statusCode) defaultMessage args
+            Localization.localizeStringWithDefault defaultMessage (String.fromInt statusCode) args
 
         Http.BadBody errorMessage ->
             errorMessage
