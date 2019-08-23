@@ -11,7 +11,7 @@ module Engage.Http exposing
 
 # Types
 
-@docs Config
+@docs Config, Error
 
 
 # Http Verbs
@@ -29,8 +29,6 @@ module Engage.Http exposing
 @docs configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
 
 -}
-
---import Json.Decode.Pipeline exposing (..)
 
 import Engage.Localization as Localization exposing (Localization)
 import Http
@@ -108,8 +106,8 @@ delete { baseUrl, headers } toMsg decoder { methodName, value } =
 
 {-| Configuration type
 
-  - `baseUrl` the base URL for Http request
-  - `headers`: list of the header for Http request
+  - `baseUrl` the base URL for the HTTP requests
+  - `headers`: list of the headers for the HTTP requests
 
 -}
 type alias Config =
@@ -118,6 +116,11 @@ type alias Config =
     }
 
 
+{-| When a request fails, the `Failure` value will be one of these. Most of these are copied from `Http.Error` in the `elm/http` module.
+
+When there is a `BadStatus`, both the status code and the body of the response are included. This allows `getErrorMessage` to retrieve any error message in the response, if they are available.
+
+-}
 type Error
     = BadUrl String
     | Timeout
