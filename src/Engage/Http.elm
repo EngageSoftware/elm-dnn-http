@@ -29,10 +29,11 @@ module Engage.Http exposing
 
 -}
 
+--import Json.Decode.Pipeline exposing (..)
+
 import Engage.Localization as Localization exposing (Localization)
 import Http
 import Json.Decode as Decode exposing (..)
-import Json.Decode.Pipeline exposing (..)
 import Json.Encode as Encode exposing (..)
 import RemoteData as RemoteData exposing (RemoteData)
 import String
@@ -132,9 +133,9 @@ type Error
 -}
 configDecoder : Decode.Decoder Config
 configDecoder =
-    Decode.succeed Config
-        |> required "baseUrl" Decode.string
-        |> required "headers" httpHeaderDecoder
+    Decode.map2 Config
+        (Decode.field "baseUrl" Decode.string)
+        (Decode.field "headers" httpHeaderDecoder)
 
 
 httpHeaderDecoder : Decode.Decoder (List Http.Header)
