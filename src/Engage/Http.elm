@@ -123,7 +123,7 @@ type Error
     | Timeout
     | NetworkError
     | BadStatus Int String
-    | BadPayload String
+    | BadBody String
 
 
 
@@ -184,7 +184,7 @@ expectJsonAsRemoteData toMsg decoder =
                     body
                         |> Decode.decodeString decoder
                         |> Result.mapError Decode.errorToString
-                        |> Result.mapError BadPayload
+                        |> Result.mapError BadBody
 
                 Http.BadStatus_ { statusCode } body ->
                     Err (BadStatus statusCode body)
@@ -247,7 +247,7 @@ getErrorMessage args error =
                 |> Result.toMaybe
                 |> Maybe.withDefault defaultMessage
 
-        BadPayload errorMessage ->
+        BadBody errorMessage ->
             errorMessage
 
 
