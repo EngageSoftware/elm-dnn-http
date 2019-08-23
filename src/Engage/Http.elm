@@ -3,6 +3,7 @@ module Engage.Http exposing
     , get, post, patch, put, delete
     , getErrorMessage
     , configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
+    , Error
     )
 
 {-| Helpers for working with DNN Web API
