@@ -34,8 +34,7 @@ import Http
 import Json.Decode as Decode exposing (..)
 import Json.Decode.Pipeline exposing (..)
 import Json.Encode as Encode exposing (..)
-import RemoteData as RemoteData exposing (WebData)
-import RemoteData.Http as RemoteHttp exposing (defaultTaskConfig)
+import RemoteData as RemoteData exposing (RemoteData)
 import String
 import Task as Task exposing (Task)
 import Url.Builder
@@ -43,82 +42,62 @@ import Url.Builder
 
 {-| Http GET
 -}
-get : Config -> Decode.Decoder success -> { methodName : String, queryStringParams : List ( String, String ) } -> Task () (WebData success)
-get { baseUrl, headers } decoder { methodName, queryStringParams } =
-    let
-        config : RemoteHttp.TaskConfig
-        config =
-            { defaultTaskConfig | headers = headers }
-
-        url : String
-        url =
-            urlwithQueryString baseUrl methodName queryStringParams
-    in
-    RemoteHttp.getTaskWithConfig config url decoder
+get : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, queryStringParams : List ( String, String ) } -> Cmd msg
+get { baseUrl, headers } toMsg decoder { methodName, queryStringParams } =
+    request "GET"
+        headers
+        (urlwithQueryString baseUrl methodName queryStringParams)
+        Http.emptyBody
+        toMsg
+        decoder
 
 
 {-| Http POST
 -}
-post : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task () (WebData success)
-post { baseUrl, headers } decoder { methodName, value } =
-    let
-        config : RemoteHttp.TaskConfig
-        config =
-            { defaultTaskConfig | headers = headers }
-
-        url : String
-        url =
-            urlwithQueryString baseUrl methodName []
-    in
-    RemoteHttp.postTaskWithConfig config url decoder value
+post : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Cmd msg
+post { baseUrl, headers } toMsg decoder { methodName, value } =
+    request "POST"
+        headers
+        (urlwithQueryString baseUrl methodName [])
+        (Http.jsonBody value)
+        toMsg
+        decoder
 
 
 {-| Http PUT
 -}
-put : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task () (WebData success)
-put { baseUrl, headers } decoder { methodName, value } =
-    let
-        config : RemoteHttp.TaskConfig
-        config =
-            { defaultTaskConfig | headers = headers }
-
-        url : String
-        url =
-            urlwithQueryString baseUrl methodName []
-    in
-    RemoteHttp.putTaskWithConfig config url decoder value
+put : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Cmd msg
+put { baseUrl, headers } toMsg decoder { methodName, value } =
+    request "PUT"
+        headers
+        (urlwithQueryString baseUrl methodName [])
+        (Http.jsonBody value)
+        toMsg
+        decoder
 
 
 {-| Http PATCH
 -}
-patch : Config -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Task () (WebData success)
-patch { baseUrl, headers } decoder { methodName, value } =
-    let
-        config : RemoteHttp.TaskConfig
-        config =
-            { defaultTaskConfig | headers = headers }
-
-        url : String
-        url =
-            urlwithQueryString baseUrl methodName []
-    in
-    RemoteHttp.patchTaskWithConfig config url decoder value
+patch : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Cmd msg
+patch { baseUrl, headers } toMsg decoder { methodName, value } =
+    request "PATCH"
+        headers
+        (urlwithQueryString baseUrl methodName [])
+        (Http.jsonBody value)
+        toMsg
+        decoder
 
 
 {-| Http DELETE
 -}
-delete : Config -> { methodName : String, value : Encode.Value } -> Task () (WebData String)
-delete { baseUrl, headers } { methodName, value } =
-    let
-        config : RemoteHttp.TaskConfig
-        config =
-            { defaultTaskConfig | headers = headers }
-
-        url : String
-        url =
-            urlwithQueryString baseUrl methodName []
-    in
-    RemoteHttp.deleteTaskWithConfig config url value
+delete : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Cmd msg
+delete { baseUrl, headers } toMsg decoder { methodName, value } =
+    request "DELETE"
+        headers
+        (urlwithQueryString baseUrl methodName [])
+        (Http.jsonBody value)
+        toMsg
+        decoder
 
 
 
@@ -135,6 +114,14 @@ type alias Config =
     { baseUrl : String
     , headers : List Http.Header
     }
+
+
+type Error
+    = BadUrl String
+    | Timeout
+    | NetworkError
+    | BadStatus Int String
+    | BadPayload String
 
 
 
@@ -173,6 +160,50 @@ nullDecoder =
 -- Helpers
 
 
+request : String -> List Http.Header -> String -> Http.Body -> (RemoteData Error success -> msg) -> Decode.Decoder success -> Cmd msg
+request method headers url body toMsg decoder =
+    Http.request
+        { method = method
+        , headers = headers
+        , url = url
+        , body = body
+        , expect = expectJsonAsRemoteData toMsg decoder
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+expectJsonAsRemoteData : (RemoteData Error success -> msg) -> Decode.Decoder success -> Http.Expect msg
+expectJsonAsRemoteData toMsg decoder =
+    let
+        parseResponse response =
+            case response of
+                Http.GoodStatus_ _ body ->
+                    body
+                        |> Decode.decodeString decoder
+                        |> Result.mapError Decode.errorToString
+                        |> Result.mapError BadPayload
+
+                Http.BadStatus_ { statusCode } body ->
+                    Err (BadStatus statusCode body)
+
+                Http.NetworkError_ ->
+                    Err NetworkError
+
+                Http.Timeout_ ->
+                    Err Timeout
+
+                Http.BadUrl_ url ->
+                    Err (BadUrl url)
+
+        resultToMsg result =
+            result
+                |> RemoteData.fromResult
+                |> toMsg
+    in
+    Http.expectStringResponse resultToMsg parseResponse
+
+
 ensureStringEndsWithSlash : String -> String
 ensureStringEndsWithSlash baseUrl =
     if String.endsWith "/" baseUrl then
@@ -190,28 +221,31 @@ urlwithQueryString baseUrl methodName queryStringParams =
         |> (\query -> ensureStringEndsWithSlash baseUrl ++ methodName ++ query)
 
 
-{-| Get the localized error message from the `Http.Error`
+{-| Get the localized error message from the `Error`
 -}
-getErrorMessage : { a | localization : Localization } -> Http.Error -> String
+getErrorMessage : { a | localization : Localization } -> Error -> String
 getErrorMessage args error =
     case error of
-        Http.BadUrl url ->
+        BadUrl url ->
             url
 
-        Http.Timeout ->
+        Timeout ->
             Localization.localizeString "NetworkTimeout" args
 
-        Http.NetworkError ->
+        NetworkError ->
             Localization.localizeString "NetworkError" args
 
-        Http.BadStatus statusCode ->
+        BadStatus statusCode body ->
             let
                 defaultMessage =
                     Localization.localizeStringWithDefault "Server.Error" "Server.Error" args
             in
-            Localization.localizeStringWithDefault defaultMessage (String.fromInt statusCode) args
+            body
+                |> Decode.decodeString (serverErrorDecoder args)
+                |> Result.toMaybe
+                |> Maybe.withDefault defaultMessage
 
-        Http.BadBody errorMessage ->
+        BadPayload errorMessage ->
             errorMessage
 
 
