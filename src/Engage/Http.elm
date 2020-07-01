@@ -1,6 +1,7 @@
 module Engage.Http exposing
     ( Config, Error(..)
     , get, post, patch, put, delete
+    , requestJson, requestString
     , getErrorMessage
     , configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
     )
@@ -13,9 +14,14 @@ module Engage.Http exposing
 @docs Config, Error
 
 
-# Http Verbs
+# HTTP Verbs
 
 @docs get, post, patch, put, delete
+
+
+# Raw requests
+
+@docs requestJson, requestString
 
 
 # Helper functions
@@ -23,7 +29,7 @@ module Engage.Http exposing
 @docs getErrorMessage
 
 
-# Decode/Encoder
+# Decoders
 
 @docs configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
 
@@ -39,61 +45,61 @@ import Task as Task exposing (Task)
 import Url.Builder
 
 
-{-| Http GET
+{-| HTTP GET
 -}
 get : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, queryStringParams : List ( String, String ) } -> Cmd msg
 get { baseUrl, headers } toMsg decoder { methodName, queryStringParams } =
-    request "GET"
+    requestJson "GET"
         headers
-        (urlwithQueryString baseUrl methodName queryStringParams)
+        (urlWithQueryString baseUrl methodName queryStringParams)
         Http.emptyBody
         toMsg
         decoder
 
 
-{-| Http POST
+{-| HTTP POST
 -}
 post : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Cmd msg
 post { baseUrl, headers } toMsg decoder { methodName, value } =
-    request "POST"
+    requestJson "POST"
         headers
-        (urlwithQueryString baseUrl methodName [])
+        (urlWithQueryString baseUrl methodName [])
         (Http.jsonBody value)
         toMsg
         decoder
 
 
-{-| Http PUT
+{-| HTTP PUT
 -}
 put : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Cmd msg
 put { baseUrl, headers } toMsg decoder { methodName, value } =
-    request "PUT"
+    requestJson "PUT"
         headers
-        (urlwithQueryString baseUrl methodName [])
+        (urlWithQueryString baseUrl methodName [])
         (Http.jsonBody value)
         toMsg
         decoder
 
 
-{-| Http PATCH
+{-| HTTP PATCH
 -}
 patch : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Cmd msg
 patch { baseUrl, headers } toMsg decoder { methodName, value } =
-    request "PATCH"
+    requestJson "PATCH"
         headers
-        (urlwithQueryString baseUrl methodName [])
+        (urlWithQueryString baseUrl methodName [])
         (Http.jsonBody value)
         toMsg
         decoder
 
 
-{-| Http DELETE
+{-| HTTP DELETE
 -}
 delete : Config -> (RemoteData Error success -> msg) -> Decode.Decoder success -> { methodName : String, value : Encode.Value } -> Cmd msg
 delete { baseUrl, headers } toMsg decoder { methodName, value } =
-    request "DELETE"
+    requestJson "DELETE"
         headers
-        (urlwithQueryString baseUrl methodName [])
+        (urlWithQueryString baseUrl methodName [])
         (Http.jsonBody value)
         toMsg
         decoder
@@ -160,52 +166,104 @@ nullDecoder =
     Decode.null ()
 
 
+{-| JSON decoder for server error, localized.
+
+The error comes from a string field named "ExceptionMessage", "exceptionMessage", "Message", "message", or otherwise `multipleServerErrorDecoder`.
+
+-}
+serverErrorDecoder : { a | localization : Localization } -> Decoder String
+serverErrorDecoder args =
+    Decode.oneOf
+        [ Decode.field "ExceptionMessage" Decode.string
+        , Decode.field "exceptionMessage" Decode.string
+        , Decode.field "Message" Decode.string
+        , Decode.field "message" Decode.string
+        , multipleServerErrorDecoder args
+        ]
+
+
+{-| JSON decoder for multiple server error messages, localized.
+
+The messages come from a string array field named "ExceptionMessage", "exceptionMessage", "Messages", or "message".
+These values are then concatenated with spaces.
+
+-}
+multipleServerErrorDecoder : { a | localization : Localization } -> Decoder String
+multipleServerErrorDecoder args =
+    let
+        toMultipleServerErrorDecoder : List String -> Decoder String
+        toMultipleServerErrorDecoder messages =
+            messages
+                |> List.map (\message -> Localization.localizeStringWithDefault message message args)
+                |> List.foldr (\localizedMessage newMessage -> localizedMessage ++ " " ++ newMessage) ""
+                |> Decode.succeed
+    in
+    Decode.oneOf
+        [ Decode.at [ "ExceptionMessage" ] (Decode.list Decode.string) |> Decode.andThen toMultipleServerErrorDecoder
+        , Decode.at [ "exceptionMessage" ] (Decode.list Decode.string) |> Decode.andThen toMultipleServerErrorDecoder
+        , Decode.at [ "Messages" ] (Decode.list Decode.string) |> Decode.andThen toMultipleServerErrorDecoder
+        , Decode.at [ "messages" ] (Decode.list Decode.string) |> Decode.andThen toMultipleServerErrorDecoder
+        ]
+
+
 
 -- Helpers
 
 
-request : String -> List Http.Header -> String -> Http.Body -> (RemoteData Error success -> msg) -> Decode.Decoder success -> Cmd msg
-request method headers url body toMsg decoder =
+{-| Raw request that expects a JSON response.
+
+This version can use any method and accepts any body (e.g. `Http.fileBody`, `Http.bytesBody`, or `Http.emptyBody`).
+
+-}
+requestJson : String -> List Http.Header -> String -> Http.Body -> (RemoteData Error success -> msg) -> Decode.Decoder success -> Cmd msg
+requestJson method headers url requestBody toMsg decoder =
+    let
+        toResult _ responseBody =
+            responseBody
+                |> Decode.decodeString decoder
+                |> Result.mapError Decode.errorToString
+                |> Result.mapError BadBody
+    in
+    requestString method headers url requestBody toMsg toResult
+
+
+{-| Raw request that expects a `String` response (but not necessarily a valid JSON `String`).
+
+This version can use any method and accepts any body (e.g. `Http.fileBody`, `Http.bytesBody`, or `Http.emptyBody`).
+Additionally, instead of providing a `Json.Decode.Decoder` to handle the response, you provide a function which can
+transform the `String` response body (and response metadata) however you need.
+
+-}
+requestString : String -> List Http.Header -> String -> Http.Body -> (RemoteData Error success -> msg) -> (Http.Metadata -> String -> Result Error success) -> Cmd msg
+requestString method headers url body toMsg goodStatusToResult =
     Http.request
         { method = method
         , headers = headers
         , url = url
         , body = body
-        , expect = expectJsonAsRemoteData toMsg decoder
+        , expect = Http.expectStringResponse (RemoteData.fromResult >> toMsg) (responseToResult goodStatusToResult)
         , timeout = Nothing
         , tracker = Nothing
         }
 
 
-expectJsonAsRemoteData : (RemoteData Error success -> msg) -> Decode.Decoder success -> Http.Expect msg
-expectJsonAsRemoteData toMsg decoder =
-    let
-        parseResponse response =
-            case response of
-                Http.GoodStatus_ _ body ->
-                    body
-                        |> Decode.decodeString decoder
-                        |> Result.mapError Decode.errorToString
-                        |> Result.mapError BadBody
+responseToResult : (Http.Metadata -> String -> Result Error success) -> Http.Response String -> Result Error success
+responseToResult goodStatusToResult response =
+    case response of
+        Http.GoodStatus_ metadata body ->
+            goodStatusToResult metadata body
 
-                Http.BadStatus_ { statusCode } body ->
-                    Err (BadStatus statusCode body)
+        Http.BadStatus_ { statusCode } body ->
+            Err (BadStatus statusCode body)
 
-                Http.NetworkError_ ->
-                    Err NetworkError
+        Http.NetworkError_ ->
+            Err NetworkError
 
-                Http.Timeout_ ->
-                    Err Timeout
+        Http.Timeout_ ->
+            Err Timeout
 
-                Http.BadUrl_ url ->
-                    Err (BadUrl url)
-
-        resultToMsg result =
-            result
-                |> RemoteData.fromResult
-                |> toMsg
-    in
-    Http.expectStringResponse resultToMsg parseResponse
+        Http.BadUrl_ url ->
+            Err (BadUrl url)
 
 
 ensureStringEndsWithSlash : String -> String
@@ -217,8 +275,8 @@ ensureStringEndsWithSlash baseUrl =
         baseUrl ++ "/"
 
 
-urlwithQueryString : String -> String -> List ( String, String ) -> String
-urlwithQueryString baseUrl methodName queryStringParams =
+urlWithQueryString : String -> String -> List ( String, String ) -> String
+urlWithQueryString baseUrl methodName queryStringParams =
     queryStringParams
         |> List.map (\( key, val ) -> Url.Builder.string key val)
         |> Url.Builder.toQuery
@@ -251,36 +309,3 @@ getErrorMessage args error =
 
         BadBody errorMessage ->
             errorMessage
-
-
-{-| Json decoder for server error, localized.
--}
-serverErrorDecoder : { a | localization : Localization } -> Decoder String
-serverErrorDecoder args =
-    Decode.oneOf
-        [ Decode.field "ExceptionMessage" Decode.string
-        , Decode.field "exceptionMessage" Decode.string
-        , Decode.field "Message" Decode.string
-        , Decode.field "message" Decode.string
-        , multipleServerErrorDecoder args
-        ]
-
-
-{-| Json decoder for multiple server error messages, localized.
--}
-multipleServerErrorDecoder : { a | localization : Localization } -> Decoder String
-multipleServerErrorDecoder args =
-    let
-        toMultipleServerErrorDecoder : List String -> Decoder String
-        toMultipleServerErrorDecoder messages =
-            messages
-                |> List.map (\message -> Localization.localizeStringWithDefault message message args)
-                |> List.foldr (\localizedMessage newMessage -> localizedMessage ++ " " ++ newMessage) ""
-                |> Decode.succeed
-    in
-    Decode.oneOf
-        [ Decode.at [ "ExceptionMessage" ] (Decode.list Decode.string) |> Decode.andThen toMultipleServerErrorDecoder
-        , Decode.at [ "exceptionMessage" ] (Decode.list Decode.string) |> Decode.andThen toMultipleServerErrorDecoder
-        , Decode.at [ "Messages" ] (Decode.list Decode.string) |> Decode.andThen toMultipleServerErrorDecoder
-        , Decode.at [ "messages" ] (Decode.list Decode.string) |> Decode.andThen toMultipleServerErrorDecoder
-        ]
