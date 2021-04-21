@@ -37,11 +37,10 @@ module Engage.Http exposing
 
 import Engage.Localization as Localization exposing (Localization)
 import Http
-import Json.Decode as Decode exposing (..)
-import Json.Encode as Encode exposing (..)
-import RemoteData as RemoteData exposing (RemoteData)
+import Json.Decode as Decode
+import Json.Encode as Encode
+import RemoteData exposing (RemoteData)
 import String
-import Task as Task exposing (Task)
 import Url.Builder
 
 
@@ -171,7 +170,7 @@ nullDecoder =
 The error comes from a string field named "ExceptionMessage", "exceptionMessage", "Message", "message", or otherwise `multipleServerErrorDecoder`.
 
 -}
-serverErrorDecoder : { a | localization : Localization } -> Decoder String
+serverErrorDecoder : { a | localization : Localization } -> Decode.Decoder String
 serverErrorDecoder args =
     Decode.oneOf
         [ Decode.field "ExceptionMessage" Decode.string
@@ -188,10 +187,10 @@ The messages come from a string array field named "ExceptionMessage", "exception
 These values are then concatenated with spaces.
 
 -}
-multipleServerErrorDecoder : { a | localization : Localization } -> Decoder String
+multipleServerErrorDecoder : { a | localization : Localization } -> Decode.Decoder String
 multipleServerErrorDecoder args =
     let
-        toMultipleServerErrorDecoder : List String -> Decoder String
+        toMultipleServerErrorDecoder : List String -> Decode.Decoder String
         toMultipleServerErrorDecoder messages =
             messages
                 |> List.map (\message -> Localization.localizeStringWithDefault message message args)
@@ -218,6 +217,7 @@ This version can use any method and accepts any body (e.g. `Http.fileBody`, `Htt
 requestJson : String -> List Http.Header -> String -> Http.Body -> (RemoteData Error success -> msg) -> Decode.Decoder success -> Cmd msg
 requestJson method headers url requestBody toMsg decoder =
     let
+        toResult : Http.Metadata -> String -> Result Error success
         toResult _ responseBody =
             responseBody
                 |> Decode.decodeString decoder
@@ -299,6 +299,7 @@ getErrorMessage args error =
 
         BadStatus statusCode body ->
             let
+                defaultMessage : String
                 defaultMessage =
                     Localization.localizeStringWithDefault "Server.Error" "Server.Error" args
             in

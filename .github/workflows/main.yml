@@ -17,5 +17,12 @@ jobs:
       - name: elm-format
         uses: sparksp/elm-format-action@v1.0.2
 
+      - name: elm-review
+        uses: sparksp/elm-review-action@v1.0.6
+        with:
+          elm_review: npx elm-review
+          elm_compiler: ./node_modules/.bin/elm
+          elm_format: ./node_modules/.bin/elm-format
+
       - name: elm-test-rs
         run: ./node_modules/.bin/elm-test-rs
