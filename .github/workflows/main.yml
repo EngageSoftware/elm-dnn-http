@@ -12,7 +12,7 @@ jobs:
       - name: Install Elm tools and cache $ELM_HOME
         uses: mpizenberg/elm-tooling-action@v1.1
         with:
-          cache-key: elm-tooling
+          cache-key: elm-tooling.json
 
       - name: elm-format
         uses: sparksp/elm-format-action@v1.0.2
