@@ -138,6 +138,22 @@ type Error
 
 
 {-| Json decoder for `Config`
+
+    import Http
+    import Json.Decode as Decode
+
+    """
+    {
+        "baseUrl": "/API/MyModule/Search",
+        "headers": {
+            "ModuleId": "100",
+            "TabId": "404"
+        }
+    }
+    """
+        |> Decode.decodeString Engage.Http.configDecoder
+    --> Ok { baseUrl = "/API/MyModule/Search", headers = [ Http.header "ModuleId" "100", Http.header "TabId" "404" ] }
+
 -}
 configDecoder : Decode.Decoder Config
 configDecoder =
@@ -284,6 +300,50 @@ urlWithQueryString baseUrl methodName queryStringParams =
 
 
 {-| Get the localized error message from the `Error`
+
+    import Dict
+    import Engage.Localization as Localization exposing (Localization)
+
+    type alias Model =
+        { localization : Localization }
+
+    model : Model
+    model =
+        Model Localization.empty
+
+    decodeError : Engage.Http.Error
+    decodeError =
+        Engage.Http.BadBody "Problem with the given value: null Expecting an INT"
+
+    Engage.Http.getErrorMessage model decodeError
+    --> "Problem with the given value: null Expecting an INT"
+
+    errorFromServer : Engage.Http.Error
+    errorFromServer =
+        Engage.Http.BadStatus 404 """ { "Message": "The requested item wasn't found" } """
+
+    Engage.Http.getErrorMessage model errorFromServer
+    --> "The requested item wasn't found"
+
+    localizedModel : Model
+    localizedModel =
+        Dict.fromList
+            [ ( "NetworkError.Text", "The network had an issue" )
+            , ( "Server.Error", "The server had an issue" )
+            ]
+            |> Localization.fromDict
+            |> Model
+
+    statusError : Engage.Http.Error
+    statusError =
+        Engage.Http.BadStatus 404 """ 404 Error response """
+
+    Engage.Http.getErrorMessage localizedModel statusError
+    --> "The server had an issue"
+
+    Engage.Http.getErrorMessage localizedModel Engage.Http.NetworkError
+    --> "The network had an issue"
+
 -}
 getErrorMessage : { a | localization : Localization } -> Error -> String
 getErrorMessage args error =
