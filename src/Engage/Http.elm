@@ -292,16 +292,16 @@ getErrorMessage args error =
             url
 
         Timeout ->
-            Localization.localizeString "NetworkTimeout" args
+            Localization.localizeStringWithDefault "There was an error communicating with the server, please try again" "NetworkTimeout" args
 
         NetworkError ->
-            Localization.localizeString "NetworkError" args
+            Localization.localizeStringWithDefault "There was an error sending your request, please check your connection" "NetworkError" args
 
         BadStatus statusCode body ->
             let
                 defaultMessage : String
                 defaultMessage =
-                    Localization.localizeStringWithDefault "Server.Error" "Server.Error" args
+                    Localization.localizeStringWithDefault "There was an error processing your request" "Server.Error" args
             in
             body
                 |> Decode.decodeString (serverErrorDecoder args)

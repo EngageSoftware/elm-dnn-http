@@ -205,7 +205,7 @@ getErrorMessageTests =
             \_ ->
                 Engage.Http.Timeout
                     |> Engage.Http.getErrorMessage { localization = Engage.Localization.empty }
-                    |> Expect.equal "[NetworkTimeout]"
+                    |> Expect.equal "There was an error communicating with the server, please try again"
         , test "Can get localized Timeout message" <|
             \_ ->
                 Engage.Http.Timeout
@@ -215,7 +215,7 @@ getErrorMessageTests =
             \_ ->
                 Engage.Http.NetworkError
                     |> Engage.Http.getErrorMessage { localization = Engage.Localization.empty }
-                    |> Expect.equal "[NetworkError]"
+                    |> Expect.equal "There was an error sending your request, please check your connection"
         , test "Can get localized NetworkError message" <|
             \_ ->
                 Engage.Http.NetworkError
@@ -225,7 +225,7 @@ getErrorMessageTests =
             \_ ->
                 Engage.Http.BadStatus 404 """ { "ErrorMessage": "It wasn't found" } """
                     |> Engage.Http.getErrorMessage { localization = Engage.Localization.empty }
-                    |> Expect.equal "Server.Error"
+                    |> Expect.equal "There was an error processing your request"
         , test "Can get localized default BadStatus message" <|
             \_ ->
                 Engage.Http.BadStatus 404 """ { "ErrorMessage": "It wasn't found" } """
