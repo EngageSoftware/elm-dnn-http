@@ -1,2 +1,2 @@
 #!/usr/bin/env pwsh
-npx --quiet elm-review @Args;
+npx --yes --quiet elm-review @Args;
