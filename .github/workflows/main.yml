@@ -18,7 +18,7 @@ jobs:
         uses: sparksp/elm-format-action@v1.0.2
 
       - name: elm-review
-        uses: sparksp/elm-review-action@v1.0.6
+        uses: sparksp/elm-review-action@v1.0.8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
