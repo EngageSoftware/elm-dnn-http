@@ -16,6 +16,7 @@ suite =
         , nullDecoderTests
         , serverErrorDecoderTests
         , getErrorMessageTests
+        , urlWithQueryStringTests
         ]
 
 
@@ -236,4 +237,66 @@ getErrorMessageTests =
                 Engage.Http.BadStatus 404 """ { "Message": "It wasn't found" } """
                     |> Engage.Http.getErrorMessage { localization = Engage.Localization.empty }
                     |> Expect.equal "It wasn't found"
+        ]
+
+
+urlWithQueryStringTests : Test
+urlWithQueryStringTests =
+    describe "urlWithQueryString"
+        [ test "empty" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "" "" []
+                    |> Expect.equal "/"
+        , test "relative base" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "/api/" "" []
+                    |> Expect.equal "/api/"
+        , test "relative base ensures ends with slash" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "/api" "" []
+                    |> Expect.equal "/api/"
+        , test "relative base with path separated by slash" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "/api" "cat/blog" []
+                    |> Expect.equal "/api/cat/blog"
+        , test "relative multi-part base with path separated by slash" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "/DesktopModules/MyCompany/API/MyModule" "cat/blog" []
+                    |> Expect.equal "/DesktopModules/MyCompany/API/MyModule/cat/blog"
+        , test "absolute base" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com/" "" []
+                    |> Expect.equal "https://example.com/"
+        , test "absolute base ensures ends with slash" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com" "" []
+                    |> Expect.equal "https://example.com/"
+        , test "absolute base with path separated by slash" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com" "cat/blog" []
+                    |> Expect.equal "https://example.com/cat/blog"
+        , test "absolute multi-part base with path separated by slash" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com/DesktopModules/MyCompany/API/MyModule" "cat/blog" []
+                    |> Expect.equal "https://example.com/DesktopModules/MyCompany/API/MyModule/cat/blog"
+        , test "no methodName - single query-string added with question mark" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com/API/MyModule" "" [ ( "page", "1" ) ]
+                    |> Expect.equal "https://example.com/API/MyModule/?page=1"
+        , test "with methodName - single query-string added with question mark" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com/API/MyModule" "elevate" [ ( "page", "1" ) ]
+                    |> Expect.equal "https://example.com/API/MyModule/elevate?page=1"
+        , test "no methodName - many query-strings" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com/API/MyModule" "" [ ( "page", "1" ), ( "name", "fang" ), ( "type", "page" ), ( "author", "b" ), ( "choice", "0" ) ]
+                    |> Expect.equal "https://example.com/API/MyModule/?page=1&name=fang&type=page&author=b&choice=0"
+        , test "with methodName - many query-strings" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com/API/MyModule" "elevate" [ ( "name", "fang" ), ( "type", "page" ), ( "author", "b" ), ( "choice", "0" ) ]
+                    |> Expect.equal "https://example.com/API/MyModule/elevate?name=fang&type=page&author=b&choice=0"
+        , test "query string values encoded" <|
+            \_ ->
+                Engage.Http.urlWithQueryString "https://example.com/" "" [ ( "name", "Brené Brown" ), ( "type", "one & done" ), ( "other", "b (or c)" ) ]
+                    |> Expect.equal "https://example.com/?name=Bren%C3%A9%20Brown&type=one%20%26%20done&other=b%20(or%20c)"
         ]

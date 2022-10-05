@@ -2,7 +2,7 @@ module Engage.Http exposing
     ( Config, Error(..)
     , get, post, patch, put, delete
     , requestJson, requestString
-    , getErrorMessage
+    , getErrorMessage, urlWithQueryString
     , configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
     )
 
@@ -26,7 +26,7 @@ module Engage.Http exposing
 
 # Helper functions
 
-@docs getErrorMessage
+@docs getErrorMessage, urlWithQueryString
 
 
 # Decoders
@@ -291,6 +291,29 @@ ensureStringEndsWithSlash baseUrl =
         baseUrl ++ "/"
 
 
+{-| Get the full URL from a base URL, a method name (i.e. a route), and query string values.
+
+The function adds a trailing slash to the base URL if missing. Query string values are URL encoded.
+
+    config : Engage.Http.Config
+    config =
+        { baseUrl = "https://example.com/API/MyModule"
+        , headers = []
+        }
+
+    Engage.Http.urlWithQueryString config.baseUrl "" []
+    --> "https://example.com/API/MyModule/"
+
+    Engage.Http.urlWithQueryString config.baseUrl "health" []
+    --> "https://example.com/API/MyModule/health"
+
+    Engage.Http.urlWithQueryString config.baseUrl "articles" [ ( "page", "1" ) ]
+    --> "https://example.com/API/MyModule/articles?page=1"
+
+    Engage.Http.urlWithQueryString config.baseUrl "author" [ ( "name", "Joël Quenneville" ) ]
+    --> "https://example.com/API/MyModule/author?name=Jo%C3%ABl%20Quenneville"
+
+-}
 urlWithQueryString : String -> String -> List ( String, String ) -> String
 urlWithQueryString baseUrl methodName queryStringParams =
     queryStringParams
