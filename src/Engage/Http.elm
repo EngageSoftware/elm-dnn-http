@@ -1,7 +1,7 @@
 module Engage.Http exposing
     ( Config, Error(..)
     , get, post, patch, put, delete
-    , requestJson, requestString
+    , requestJson, requestString, requestAnything
     , getErrorMessage, urlWithQueryString
     , configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
     )
@@ -21,7 +21,7 @@ module Engage.Http exposing
 
 # Raw requests
 
-@docs requestJson, requestString
+@docs requestJson, requestString, requestAnything
 
 
 # Helper functions
@@ -243,6 +243,21 @@ requestJson method headers url requestBody toMsg decoder =
     requestString method headers url requestBody toMsg toResult
 
 
+{-| Raw request that does not expect a response.
+
+This version can use any method and accepts any body (e.g. `Http.fileBody`, `Http.bytesBody`, or `Http.emptyBody`).
+
+-}
+requestAnything : String -> List Http.Header -> String -> Http.Body -> (RemoteData Error () -> msg) -> Cmd msg
+requestAnything method headers url requestBody toMsg =
+    let
+        toResult : Http.Metadata -> String -> Result Error ()
+        toResult _ _ =
+            Ok ()
+    in
+    requestString method headers url requestBody toMsg toResult
+
+
 {-| Raw request that expects a `String` response (but not necessarily a valid JSON `String`).
 
 This version can use any method and accepts any body (e.g. `Http.fileBody`, `Http.bytesBody`, or `Http.emptyBody`).
@@ -382,6 +397,7 @@ getErrorMessage args error =
 
         BadStatus statusCode body ->
             let
+                --TODO: Differentiate message based on status code
                 defaultMessage : String
                 defaultMessage =
                     Localization.localizeStringWithDefault "There was an error processing your request" "Server.Error" args
