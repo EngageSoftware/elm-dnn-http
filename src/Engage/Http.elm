@@ -395,7 +395,7 @@ getErrorMessage args error =
         NetworkError ->
             Localization.localizeStringWithDefault "There was an error sending your request, please check your connection" "NetworkError" args
 
-        BadStatus statusCode body ->
+        BadStatus _ body ->
             let
                 --TODO: Differentiate message based on status code
                 defaultMessage : String
