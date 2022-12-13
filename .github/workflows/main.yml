@@ -17,7 +17,7 @@ jobs:
           cache-key: elm-tooling.json
 
       - name: elm-format
-        uses: sparksp/elm-format-action@v1.0.3
+        uses: sparksp/elm-format-action@v1.0.4
 
       - name: elm-review
         uses: sparksp/elm-review-action@v1.0.9
