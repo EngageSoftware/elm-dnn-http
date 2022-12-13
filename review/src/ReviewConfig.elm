@@ -34,7 +34,7 @@ import NoUnused.Parameters
 import NoUnused.Patterns
 import NoUnused.Variables
 import NoUselessSubscriptions
-import Review.Rule exposing (Rule)
+import Review.Rule as Rule exposing (Rule)
 
 
 config : List Rule
@@ -68,3 +68,4 @@ config =
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
     ]
+    |> List.map (Rule.ignoreErrorsForDirectories [ "tests/VerifyExamples" ])
