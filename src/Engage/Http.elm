@@ -253,11 +253,6 @@ This version can use any method and accepts any body (e.g. `Http.fileBody`, `Htt
 requestBytes : String -> List Http.Header -> String -> Http.Body -> (RemoteData Error Bytes -> msg) -> Cmd msg
 requestBytes method headers url requestBody toMsg =
     let
-        sizedStringDecoder : Bytes.Decode.Decoder String
-        sizedStringDecoder =
-            Bytes.Decode.unsignedInt32 Bytes.BE
-                |> Bytes.Decode.andThen Bytes.Decode.string
-
         toResult : Http.Response Bytes -> Result Error Bytes
         toResult response =
             case response of
@@ -266,7 +261,7 @@ requestBytes method headers url requestBody toMsg =
 
                 Http.BadStatus_ { statusCode } body ->
                     body
-                        |> Bytes.Decode.decode sizedStringDecoder
+                        |> Bytes.Decode.decode (body |> Bytes.width |> Bytes.Decode.string)
                         |> Maybe.withDefault ("An unknown error occurred decoding the " ++ String.fromInt statusCode ++ " response")
                         |> BadStatus statusCode
                         |> Err
