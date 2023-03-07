@@ -1,10 +1,9 @@
 module Engage.Http exposing
     ( Config, Error(..)
     , get, post, patch, put, delete
-    , requestJson, requestString, requestAnything
+    , requestJson, requestString, requestAnything, requestBytes
     , getErrorMessage, urlWithQueryString
     , configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
-    , requestBytes
     )
 
 {-| Helpers for working with DNN Web API
