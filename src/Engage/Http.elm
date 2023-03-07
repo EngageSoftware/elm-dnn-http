@@ -4,6 +4,7 @@ module Engage.Http exposing
     , requestJson, requestString, requestAnything
     , getErrorMessage, urlWithQueryString
     , configDecoder, serverErrorDecoder, multipleServerErrorDecoder, nullDecoder
+    , requestBytes
     )
 
 {-| Helpers for working with DNN Web API
@@ -21,7 +22,7 @@ module Engage.Http exposing
 
 # Raw requests
 
-@docs requestJson, requestString, requestAnything
+@docs requestJson, requestString, requestAnything, requestBytes
 
 
 # Helper functions
@@ -35,6 +36,8 @@ module Engage.Http exposing
 
 -}
 
+import Bytes exposing (Bytes)
+import Bytes.Decode
 import Engage.Localization as Localization exposing (Localization)
 import Http
 import Json.Decode as Decode
@@ -241,6 +244,52 @@ requestJson method headers url requestBody toMsg decoder =
                 |> Result.mapError BadBody
     in
     requestString method headers url requestBody toMsg toResult
+
+
+{-| Raw request that expects a Bytes response.
+
+This version can use any method and accepts any body (e.g. `Http.fileBody`, `Http.bytesBody`, or `Http.emptyBody`).
+
+-}
+requestBytes : String -> List Http.Header -> String -> Http.Body -> (RemoteData Error Bytes -> msg) -> Cmd msg
+requestBytes method headers url requestBody toMsg =
+    let
+        sizedStringDecoder : Bytes.Decode.Decoder String
+        sizedStringDecoder =
+            Bytes.Decode.unsignedInt32 Bytes.BE
+                |> Bytes.Decode.andThen Bytes.Decode.string
+
+        toResult : Http.Response Bytes -> Result Error Bytes
+        toResult response =
+            case response of
+                Http.GoodStatus_ _ body ->
+                    Ok body
+
+                Http.BadStatus_ { statusCode } body ->
+                    body
+                        |> Bytes.Decode.decode sizedStringDecoder
+                        |> Maybe.withDefault ("An unknown error occurred decoding the " ++ String.fromInt statusCode ++ " response")
+                        |> BadStatus statusCode
+                        |> Err
+
+                Http.NetworkError_ ->
+                    Err NetworkError
+
+                Http.Timeout_ ->
+                    Err Timeout
+
+                Http.BadUrl_ badUrl ->
+                    Err (BadUrl badUrl)
+    in
+    Http.request
+        { method = method
+        , headers = headers
+        , url = url
+        , body = requestBody
+        , expect = Http.expectBytesResponse (RemoteData.fromResult >> toMsg) toResult
+        , timeout = Nothing
+        , tracker = Nothing
+        }
 
 
 {-| Raw request that does not expect a response.
