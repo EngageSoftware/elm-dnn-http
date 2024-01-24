@@ -29,7 +29,7 @@ jobs:
           elm_format: ./node_modules/.bin/elm-format
 
       - name: elm-verify-examples
-        run: npx --yes elm-verify-examples
+        run: npx --yes elm-verify-examples@5.3.0
 
       - name: elm-test-rs
         run: ./node_modules/.bin/elm-test-rs
