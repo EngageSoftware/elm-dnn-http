@@ -9,7 +9,7 @@ jobs:
       checks: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Elm tools and cache $ELM_HOME
         uses: mpizenberg/elm-tooling-action@v1.7
