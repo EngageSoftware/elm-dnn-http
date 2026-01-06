@@ -42,7 +42,6 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import RemoteData exposing (RemoteData)
-import String
 import Url.Builder
 
 
