@@ -9,18 +9,18 @@ jobs:
       checks: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Elm tools and cache $ELM_HOME
-        uses: mpizenberg/elm-tooling-action@v1.7
+        uses: mpizenberg/elm-tooling-action@3eb99d8ceddbfd19e6007be7ba63d5dac9e9b2f0 # v2.0.0
         with:
           cache-key: elm-tooling.json
 
       - name: elm-format
-        uses: sparksp/elm-format-action@v1.0.4
+        uses: sparksp/elm-format-action@c1e0bea196510423a34233b8ac8c5fb17cf010b6 # v1.0.4
 
       - name: elm-review
-        uses: sparksp/elm-review-action@v1.2.0
+        uses: sparksp/elm-review-action@392d83b512d9ab818a5b1588599248944416311f # v1.2.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -29,12 +29,12 @@ jobs:
           elm_format: ./node_modules/.bin/elm-format
 
       - name: elm-verify-examples
-        run: npx --yes elm-verify-examples@5.3.0
+        run: npx --yes elm-verify-examples@6.0.3
 
       - name: elm-test-rs
         run: ./node_modules/.bin/elm-test-rs
 
-      - uses: dillonkearns/elm-publish-action@v2.1.0
+      - uses: dillonkearns/elm-publish-action@deab1ae44c3ce214c27183060bbccd7c98d3b1f1 # v2.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-elm: ./node_modules/.bin/elm
