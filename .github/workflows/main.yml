@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Elm tools and cache $ELM_HOME
-        uses: mpizenberg/elm-tooling-action@3eb99d8ceddbfd19e6007be7ba63d5dac9e9b2f0 # v2.0.0
+        uses: mpizenberg/elm-tooling-action@cbc43aedc689be4271ecec1bdd18755a6ed7f8f3 # v2.1.0
         with:
           cache-key: elm-tooling.json
 
